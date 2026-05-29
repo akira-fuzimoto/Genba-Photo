@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>現場写真管理</title>
+<style>
+  :root {
+    --blue: #1a6fc4;
+    --blue-light: #e8f2fd;
+    --blue-dark: #0d4a8a;
+    --gray-bg: #f4f5f7;
+    --gray-border: #e0e2e7;
+    --gray-text: #6b7280;
+    --text: #1a1d23;
+    --white: #ffffff;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; background: var(--gray-bg); color: var(--text); min-height: 100vh; }
+
+  /* Header */
+  .header { background: var(--white); border-bottom: 1px solid var(--gray-border); padding: 14px 16px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 100; }
+  .header-icon { width: 36px; height: 36px; background: var(--blue); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .header-icon svg { fill: white; width: 20px; height: 20px; }
+  .header-title { font-size: 17px; font-weight: 700; color: var(--text); flex: 1; }
+  .user-chip { background: var(--blue-light); color: var(--blue); font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 20px; cursor: pointer; white-space: nowrap; }
+
+  /* Tabs */
+  .tabs { background: var(--white); display: flex; border-bottom: 1px solid var(--gray-border); position: sticky; top: 65px; z-index: 99; }
+  .tab { flex: 1; padding: 12px 4px; font-size: 13px; font-weight: 600; color: var(--gray-text); text-align: center; cursor: pointer; border-bottom: 2.5px solid transparent; transition: all .2s; }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  /* Content */
+  .content { padding: 12px; padding-bottom: 90px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .stat { background: var(--white); border-radius: var(--radius); padding: 14px; }
+  .stat-num { font-size: 26px; font-weight: 700; color: var(--blue); }
+  .stat-lbl { font-size: 12px; color: var(--gray-text); margin-top: 2px; }
+
+  /* Cards */
+  .card { background: var(--white); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .card-head { padding: 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .card-icon-wrap { width: 44px; height: 44px; border-radius: 10px; background: var(--blue-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .card-icon-wrap svg { fill: var(--blue); width: 22px; height: 22px; }
+  .card-info { flex: 1; min-width: 0; }
+  .card-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-meta { font-size: 12px; color: var(--gray-text); margin-top: 3px; }
+  .count-badge { background: var(--blue); color: white; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; flex-shrink: 0; }
+
+  /* Photo Grid */
+  .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+  .thumb { position: relative; aspect-ratio: 1; background: var(--gray-bg); overflow: hidden; cursor: pointer; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb-label { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.6)); padding: 10px 5px 4px; }
+  .thumb-label span { font-size: 10px; color: white; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Date section */
+  .date-sep { font-size: 12px; font-weight: 600; color: var(--gray-text); padding: 14px 0 8px; letter-spacing: .05em; }
+
+  /* FAB */
+  .fab { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--blue); color: white; border: none; border-radius: 30px; padding: 16px 28px; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 20px rgba(26,111,196,0.4); z-index: 200; white-space: nowrap; transition: transform .15s; }
+  .fab:active { transform: translateX(-50%) scale(0.96); }
+  .fab svg { fill: white; width: 20px; height: 20px; }
+
+  /* Empty */
+  .empty { text-align: center; padding: 60px 24px; color: var(--gray-text); }
+  .empty svg { fill: var(--gray-border); width: 48px; height: 48px; margin: 0 auto 12px; display: block; }
+  .empty p { font-size: 14px; }
+
+  /* Modal Overlay */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; display: flex; align-items: flex-end; }
+  .sheet { background: var(--white); border-radius: 20px 20px 0 0; width: 100%; max-height: 92vh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 20px); }
+  .sheet-handle { width: 36px; height: 4px; background: var(--gray-border); border-radius: 2px; margin: 12px auto 0; }
+  .sheet-title { font-size: 17px; font-weight: 700; padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between; }
+  .sheet-close { background: var(--gray-bg); border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--gray-text); }
+
+  /* Form */
+  .form-item { padding: 8px 16px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--gray-text); margin-bottom: 6px; display: block; }
+  .form-input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--gray-border); border-radius: var(--radius-sm); font-size: 16px; font-family: inherit; background: var(--white); color: var(--text); transition: border-color .2s; }
+  .form-input:focus { outline: none; border-color: var(--blue); }
+
+  /* Upload area */
+  .upload-area { margin: 8px 16px; border: 2px dashed var(--gray-border); border-radius: var(--radius); padding: 24px; text-align: center; cursor: pointer; transition: all .2s; }
+  .upload-area.dragover { border-color: var(--blue); background: var(--blue-light); }
+  .upload-area svg { fill: var(--gray-text); width: 32px; height: 32px; margin: 0 auto 8px; display: block; }
+  .upload-area p { font-size: 14px; color: var(--gray-text); }
+  .upload-area small { font-size: 12px; color: var(--gray-border); }
+
+  .preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 16px; }
+  .preview-item { position: relative; aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden; background: var(--gray-bg); }
+  .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+  .preview-del { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; background: rgba(0,0,0,0.65); border: none; border-radius: 50%; color: white; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+
+  .progress-bar { height: 4px; background: var(--gray-border); border-radius: 2px; margin: 0 16px 8px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--blue); border-radius: 2px; transition: width .3s; }
+
+  .btn-submit { width: calc(100% - 32px); margin: 10px 16px; padding: 16px; background: var(--blue); color: white; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .2s; }
+  .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-submit:active { opacity: 0.85; }
+
+  /* Viewer */
+  .viewer { position: fixed; inset: 0; background: #000; z-index: 400; display: flex; flex-direction: column; }
+  .viewer-bar { padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+  .viewer-btn { background: rgba(255,255,255,0.15); border: none; width: 38px; height: 38px; border-radius: 50%; color: white; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .viewer-counter { color: rgba(255,255,255,0.7); font-size: 14px; flex: 1; text-align: center; }
+  .viewer-img-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .viewer-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .viewer-footer { padding: 12px 16px; background: rgba(0,0,0,0.6); }
+  .viewer-site { font-size: 15px; font-weight: 600; color: white; }
+  .viewer-meta { font-size: 12px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+
+  /* Back bar */
+  .back-bar { display: flex; align-items: center; gap: 10px; padding: 10px 0 14px; cursor: pointer; color: var(--blue); font-size: 14px; font-weight: 600; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: #1a1d23; color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; font-weight: 500; z-index: 500; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  /* User modal */
+  .user-form { padding: 0 0 8px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="header">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/><path d="M3 5h2v14H3zm16 0h2v14h-2z" style="display:none"/></svg>
+      <svg viewBox="0 0 24 24" style="display:block"><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+    </div>
+    <div class="header-title">現場写真管理</div>
+    <div class="user-chip" id="userChip" onclick="openUserModal()">名前を設定</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-site" onclick="switchTab('site')">📍 現場別</div>
+    <div class="tab" id="tab-date" onclick="switchTab('date')">📅 日付別</div>
+    <div class="tab" id="tab-all" onclick="switchTab('all')">🖼️ 全写真</div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="empty"><p>読み込み中...</p></div>
+  </div>
+
+  <button class="fab" id="fab" onclick="openAddModal()">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+    写真を追加
+  </button>
+</div>
+
+<!-- ユーザー設定モーダル -->
+<div class="overlay" id="userModal" style="display:none" onclick="if(event.target===this)closeUserModal()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">ユーザー設定 <button class="sheet-close" onclick="closeUserModal()">✕</button></div>
+    <div class="user-form">
+      <div class="form-item">
+        <label class="form-label">お名前</label>
+        <input class="form-input" id="userNameInput" placeholder="例：田中 太郎" maxlength="20">
+      </div>
+      <button class="btn-submit" onclick="saveUser()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 写真追加モーダル -->
+<div class="overlay" id="addModal" style="display:none" onclick="if(event.target===this)closeAddModal()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">写真を追加 <button class="sheet-close" onclick="closeAddModal()">✕</button></div>
+    <div class="form-item">
+      <label class="form-label">現場名 *</label>
+      <input class="form-input" id="siteInput" placeholder="例：○○ビル 新築工事" list="siteList">
+      <datalist id="siteList"></datalist>
+    </div>
+    <div class="form-item">
+      <label class="form-label">日付 *</label>
+      <input class="form-input" type="date" id="dateInput">
+    </div>
+    <div class="form-item">
+      <label class="form-label">メモ（任意）</label>
+      <input class="form-input" id="memoInput" placeholder="例：外壁工事 1日目">
+    </div>
+    <label class="upload-area" id="uploadArea" for="fileInput">
+      <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+      <p>タップして写真を選択</p>
+      <small>複数枚まとめて選択できます</small>
+      <input type="file" id="fileInput" multiple accept="image/*" style="display:none" onchange="onFileSelect(event)">
+    </label>
+    <div class="preview-grid" id="previewGrid"></div>
+    <div class="progress-bar" id="progressBar" style="display:none">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+    <div id="uploadStatus" style="text-align:center;font-size:13px;color:#6b7280;padding:4px 16px;"></div>
+    <button class="btn-submit" id="submitBtn" onclick="doUpload()" disabled>追加する</button>
+  </div>
+</div>
+
+<!-- 写真ビューアー -->
+<div class="viewer" id="viewer" style="display:none">
+  <div class="viewer-bar">
+    <button class="viewer-btn" onclick="closeViewer()">✕</button>
+    <div class="viewer-counter" id="viewerCounter"></div>
+    <button class="viewer-btn" onclick="prevPhoto()">‹</button>
+    <button class="viewer-btn" onclick="nextPhoto()">›</button>
+  </div>
+  <div class="viewer-img-wrap">
+    <img id="viewerImg" src="" alt="現場写真">
+  </div>
+  <div class="viewer-footer">
+    <div class="viewer-site" id="viewerSite"></div>
+    <div class="viewer-meta" id="viewerMeta"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycby80fm_gJ4nbskHIgzroFge4pdZc5BADGwt5MRjDAmM3LVsS5yR2yxGoQgCTThmZ1XG/exec';
+
+let photos = [];
+let currentTab = 'site';
+let pendingFiles = [];
+let viewerList = [];
+let viewerIdx = 0;
+let currentSiteFilter = null;
+
+// ---- User ----
+function getUser() { return localStorage.getItem('field_user') || ''; }
+function setUser(n) { localStorage.setItem('field_user', n); }
+function openUserModal() {
+  document.getElementById('userNameInput').value = getUser();
+  document.getElementById('userModal').style.display = 'flex';
+}
+function closeUserModal() { document.getElementById('userModal').style.display = 'none'; }
+function saveUser() {
+  const n = document.getElementById('userNameInput').value.trim();
+  if (!n) { showToast('名前を入力してください'); return; }
+  setUser(n);
+  document.getElementById('userChip').textContent = n;
+  closeUserModal();
+  showToast('保存しました');
+}
+
+// ---- Load photos ----
+async function loadPhotos() {
+  try {
+    const res = await fetch(GAS_URL + '?action=getPhotos');
+    const data = await res.json();
+    if (data.status === 'ok') {
+      photos = data.photos.filter(p => p.url).reverse();
+    }
+  } catch(e) {
+    showToast('データ読み込みエラー');
+  }
+  render();
+}
+
+// ---- Tab ----
+function switchTab(t) {
+  currentTab = t;
+  currentSiteFilter = null;
+  ['site','date','all'].forEach(k => {
+    document.getElementById('tab-'+k).classList.toggle('active', k === t);
+  });
+  document.getElementById('fab').style.display = '';
+  render();
+}
+
+function render() {
+  const c = document.getElementById('content');
+  if (currentSiteFilter) { renderSiteDetail(c, currentSiteFilter); return; }
+  if (currentTab === 'site') renderSiteTab(c);
+  else if (currentTab === 'date') renderDateTab(c);
+  else renderAllTab(c);
+}
+
+function renderSiteTab(c) {
+  const map = {};
+  photos.forEach(p => { if (!map[p.site]) map[p.site] = []; map[p.site].push(p); });
+  const sites = Object.keys(map);
+  if (!sites.length) { c.innerHTML = emptyHtml('現場がまだありません'); return; }
+  
+  const frag = document.createDocumentFragment();
+
+  // Stats
+  const stats = document.createElement('div');
+  stats.className = 'stats';
+  stats.innerHTML = `<div class="stat"><div class="stat-num">${sites.length}</div><div class="stat-lbl">現場数</div></div><div class="stat"><div class="stat-num">${photos.length}</div><div class="stat-lbl">総写真枚数</div></div>`;
+  frag.appendChild(stats);
+
+  sites.forEach(site => {
+    const ps = map[site];
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `<div class="card-head">
+      <div class="card-icon-wrap"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div class="card-info"><div class="card-name">${site}</div><div class="card-meta">最新：${fmtDate(ps[0].date)}</div></div>
+      <div class="count-badge">${ps.length}枚</div>
+    </div>`;
+    card.querySelector('.card-head').onclick = () => { currentSiteFilter = site; render(); };
+    // サムネイル3枚
+    const grid = document.createElement('div');
+    grid.className = 'photo-grid';
+    ps.slice(0, 3).forEach((p, i) => { grid.appendChild(makeThumb(p, ps, i)); });
+    card.appendChild(grid);
+    frag.appendChild(card);
+  });
+  c.innerHTML = '';
+  c.appendChild(frag);
+}
+
+function renderSiteDetail(c, site) {
+  const ps = photos.filter(p => p.site === site);
+  const map = {};
+  ps.forEach(p => { if (!map[p.date]) map[p.date] = []; map[p.date].push(p); });
+  const dates = Object.keys(map).sort((a,b) => b.localeCompare(a));
+
+  const frag = document.createDocumentFragment();
+  const back = document.createElement('div');
+  back.className = 'back-bar';
+  back.innerHTML = `← ${site}`;
+  back.onclick = () => { currentSiteFilter = null; render(); };
+  frag.appendChild(back);
+
+  dates.forEach(date => {
+    const dp = map[date];
+    const sep = document.createElement('div');
+    sep.className = 'date-sep';
+    sep.textContent = fmtDate(date) + `（${dp.length}枚）`;
+    frag.appendChild(sep);
+    const grid = document.createElement('div');
+    grid.className = 'photo-grid';
+    dp.forEach((p, i) => grid.appendChild(makeThumb(p, dp, i)));
+    frag.appendChild(grid);
+  });
+  c.innerHTML = '';
+  c.appendChild(frag);
+}
+
+function renderDateTab(c) {
+  const map = {};
+  photos.forEach(p => { if (!map[p.date]) map[p.date] = []; map[p.date].push(p); });
+  const dates = Object.keys(map).sort((a,b) => b.localeCompare(a));
+  if (!dates.length) { c.innerHTML = emptyHtml('写真がありません'); return; }
+
+  const frag = document.createDocumentFragment();
+  dates.forEach(date => {
+    const dp = map[date];
+    const sep = document.createElement('div');
+    sep.className = 'date-sep';
+    sep.textContent = fmtDate(date) + `（${dp.length}枚）`;
+    frag.appendChild(sep);
+    const grid = document.createElement('div');
+    grid.className = 'photo-grid';
+    dp.forEach((p, i) => grid.appendChild(makeThumb(p, dp, i)));
+    frag.appendChild(grid);
+  });
+  c.innerHTML = '';
+  c.appendChild(frag);
+}
+
+function renderAllTab(c) {
+  if (!photos.length) { c.innerHTML = emptyHtml('写真がありません'); return; }
+  const grid = document.createElement('div');
+  grid.className = 'photo-grid';
+  photos.forEach((p, i) => grid.appendChild(makeThumb(p, photos, i)));
+  c.innerHTML = '';
+  c.appendChild(grid);
+}
+
+function makeThumb(p, list, idx) {
+  const d = document.createElement('div');
+  d.className = 'thumb';
+  d.innerHTML = `<img src="${p.url}" alt="${p.site}" loading="lazy"><div class="thumb-label"><span>${p.memo || p.site}</span></div>`;
+  d.onclick = () => openViewer(list, idx);
+  return d;
+}
+
+function emptyHtml(msg) {
+  return `<div class="empty"><svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg><p>${msg}</p></div>`;
+}
+
+// ---- Add photos ----
+function openAddModal() {
+  if (!getUser()) { openUserModal(); return; }
+  document.getElementById('dateInput').value = todayStr();
+  document.getElementById('siteInput').value = '';
+  document.getElementById('memoInput').value = '';
+  document.getElementById('previewGrid').innerHTML = '';
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('progressBar').style.display = 'none';
+  document.getElementById('uploadStatus').textContent = '';
+  pendingFiles = [];
+  // Datalist
+  const sites = [...new Set(photos.map(p => p.site))];
+  document.getElementById('siteList').innerHTML = sites.map(s => `<option value="${s}">`).join('');
+  document.getElementById('addModal').style.display = 'flex';
+}
+function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
+
+function onFileSelect(e) {
+  pendingFiles = Array.from(e.target.files);
+  const grid = document.getElementById('previewGrid');
+  grid.innerHTML = '';
+  pendingFiles.forEach((f, i) => {
+    const r = new FileReader();
+    r.onload = ev => {
+      const d = document.createElement('div');
+      d.className = 'preview-item';
+      d.id = 'prev_' + i;
+      d.innerHTML = `<img src="${ev.target.result}"><button class="preview-del" onclick="removePrev(${i})">✕</button>`;
+      grid.appendChild(d);
+    };
+    r.readAsDataURL(f);
+  });
+  document.getElementById('submitBtn').disabled = pendingFiles.length === 0;
+}
+
+function removePrev(i) {
+  pendingFiles.splice(i, 1);
+  document.getElementById('prev_' + i)?.remove();
+  document.getElementById('submitBtn').disabled = pendingFiles.length === 0;
+}
+
+async function doUpload() {
+  const site = document.getElementById('siteInput').value.trim();
+  const date = document.getElementById('dateInput').value;
+  const memo = document.getElementById('memoInput').value.trim();
+  if (!site) { showToast('現場名を入力してください'); return; }
+  if (!date) { showToast('日付を選択してください'); return; }
+  if (!pendingFiles.length) { showToast('写真を選択してください'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  document.getElementById('progressBar').style.display = 'block';
+  const total = pendingFiles.length;
+
+  for (let i = 0; i < total; i++) {
+    const f = pendingFiles[i];
+    document.getElementById('uploadStatus').textContent = `アップロード中 ${i+1} / ${total}`;
+    document.getElementById('progressFill').style.width = ((i / total) * 100) + '%';
+
+    const base64 = await fileToBase64(f);
+    const formData = new URLSearchParams();
+    formData.append('action', 'addPhoto');
+    formData.append('site', site);
+    formData.append('date', date);
+    formData.append('memo', memo);
+    formData.append('user', getUser());
+    formData.append('photoData', base64);
+    formData.append('mimeType', f.type || 'image/jpeg');
+    formData.append('fileName', f.name || 'photo.jpg');
+
+    try {
+      await fetch(GAS_URL, { method: 'POST', body: formData });
+    } catch(e) {
+      showToast('通信エラーが発生しました');
+    }
+  }
+
+  document.getElementById('progressFill').style.width = '100%';
+  document.getElementById('uploadStatus').textContent = '完了！';
+  setTimeout(() => {
+    closeAddModal();
+    showToast(`${total}枚を追加しました`);
+    loadPhotos();
+  }, 600);
+}
+
+function fileToBase64(file) {
+  return new Promise(res => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.readAsDataURL(file);
+  });
+}
+
+// ---- Viewer ----
+function openViewer(list, idx) {
+  viewerList = list;
+  viewerIdx = idx;
+  updateViewer();
+  document.getElementById('viewer').style.display = 'flex';
+}
+function closeViewer() { document.getElementById('viewer').style.display = 'none'; }
+function prevPhoto() { if (viewerIdx > 0) { viewerIdx--; updateViewer(); } }
+function nextPhoto() { if (viewerIdx < viewerList.length - 1) { viewerIdx++; updateViewer(); } }
+function updateViewer() {
+  const p = viewerList[viewerIdx];
+  document.getElementById('viewerImg').src = p.url;
+  document.getElementById('viewerCounter').textContent = `${viewerIdx+1} / ${viewerList.length}`;
+  document.getElementById('viewerSite').textContent = p.site;
+  document.getElementById('viewerMeta').textContent = `${fmtDate(p.date)}${p.memo ? ' ・ ' + p.memo : ''}　撮影：${p.user}`;
+}
+
+// ---- Helpers ----
+function fmtDate(d) {
+  if (!d) return '';
+  const p = String(d).split('-');
+  if (p.length < 3) return d;
+  return `${p[0]}年${parseInt(p[1])}月${parseInt(p[2])}日`;
+}
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ---- Init ----
+(function init() {
+  const u = getUser();
+  if (u) document.getElementById('userChip').textContent = u;
+  else setTimeout(openUserModal, 700);
+  loadPhotos();
+})();
+</script>
+</body>
+</html>
